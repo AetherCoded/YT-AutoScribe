@@ -43,7 +43,8 @@ def download_audio(video_id: str, dst: Path) -> None:
 
     dst.mkdir(parents=True, exist_ok=True)
     url = f"https://www.youtube.com/watch?v={video_id}"
-    output_tpl = str(dst / "%(_id)s.%(ext)s")
+    # use the video ID for a unique filename
+    output_tpl = str(dst / "%(id)s.%(ext)s")
     cmd = [
         "yt-dlp",
         "-f",
