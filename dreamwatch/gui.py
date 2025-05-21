@@ -29,6 +29,8 @@ class DownloaderWidget(QWidget):
         url_row = QHBoxLayout()
         url_row.addWidget(QLabel("Playlist/URL:"))
         self.url_edit = QLineEdit()
+        # validate URL as the user types
+        self.url_edit.textChanged.connect(self._check_url)
         self.url_edit.editingFinished.connect(self._check_url)
         url_row.addWidget(self.url_edit)
         self.url_status = QLabel()
@@ -39,12 +41,15 @@ class DownloaderWidget(QWidget):
         date_row.addWidget(QLabel("From:"))
         self.from_edit = QDateEdit(calendarPopup=True)
         self.from_edit.setDisplayFormat("yyyy-MM-dd")
-        self.from_edit.setDate(QDate.currentDate())
+        # Start with blank text
+        self.from_edit.setSpecialValueText("")
+        self.from_edit.setDate(self.from_edit.minimumDate())
         date_row.addWidget(self.from_edit)
         date_row.addWidget(QLabel("To:"))
         self.to_edit = QDateEdit(calendarPopup=True)
         self.to_edit.setDisplayFormat("yyyy-MM-dd")
-        self.to_edit.setDate(QDate.currentDate())
+        self.to_edit.setSpecialValueText("")
+        self.to_edit.setDate(self.to_edit.minimumDate())
         date_row.addWidget(self.to_edit)
         today_btn = QPushButton("Today")
         today_btn.clicked.connect(lambda: self.to_edit.setDate(QDate.currentDate()))
@@ -92,10 +97,15 @@ class DownloaderWidget(QWidget):
         url = self.url_edit.text().strip()
         if not url:
             return
-        date_from = self.from_edit.date().toString("yyyyMMdd")
-        date_to = self.to_edit.date().toString("yyyyMMdd")
+        # Only pass dates if the fields are not blank
+        date_from = None
+        if self.from_edit.text().strip():
+            date_from = self.from_edit.date().toString("yyyyMMdd")
+        date_to = None
+        if self.to_edit.text().strip():
+            date_to = self.to_edit.date().toString("yyyyMMdd")
         dst = Path(self.dst_edit.text().strip())
-        download_batch(url, date_from or None, date_to or None, dst)
+        download_batch(url, date_from, date_to, dst)
 
 
 class MainWindow(QMainWindow):
