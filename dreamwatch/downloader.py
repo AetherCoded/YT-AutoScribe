@@ -7,6 +7,29 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, List, Optional, Tuple
 
 
+class YtDlpNotFoundError(RuntimeError):
+    """Raised when the ``yt-dlp`` executable is missing."""
+
+
+def _run(cmd: Iterable[str], **kwargs) -> subprocess.CompletedProcess:
+    """Wrapper around :func:`subprocess.run` that provides a clearer error.
+
+    Parameters
+    ----------
+    cmd:
+        Command list to execute.
+    kwargs:
+        Additional arguments passed to :func:`subprocess.run`.
+    """
+
+    try:
+        return subprocess.run(cmd, **kwargs)
+    except FileNotFoundError as exc:
+        raise YtDlpNotFoundError(
+            "yt-dlp executable not found. Install yt-dlp and ensure it is on your PATH."
+        ) from exc
+
+
 def download_audio(video_id: str, dst: Path) -> None:
     """Download a single video's audio to ``dst``.
 
@@ -32,7 +55,7 @@ def download_audio(video_id: str, dst: Path) -> None:
         output_tpl,
         url,
     ]
-    subprocess.run(cmd, check=True)
+    _run(cmd, check=True)
 
 
 def fetch_video_ids(url: str, date_from: Optional[str], date_to: Optional[str]) -> List[str]:
@@ -43,7 +66,12 @@ def fetch_video_ids(url: str, date_from: Optional[str], date_to: Optional[str]) 
     """
 
     info_cmd = ["yt-dlp", "--flat-playlist", "-J", url]
-    result = subprocess.run(info_cmd, capture_output=True, text=True, check=True)
+    try:
+        result = _run(info_cmd, capture_output=True, text=True, check=True)
+    except YtDlpNotFoundError as exc:
+        raise exc
+    except subprocess.CalledProcessError:
+        return []
     data = json.loads(result.stdout or "{}")
     ids: List[str] = []
     for entry in data.get("entries", []):
@@ -69,7 +97,10 @@ def download_batch(
 
     dst = Path(dst)
     dst.mkdir(parents=True, exist_ok=True)
-    videos = fetch_video_ids(url, date_from, date_to)
+    try:
+        videos = fetch_video_ids(url, date_from, date_to)
+    except YtDlpNotFoundError as exc:
+        raise exc
     with ThreadPoolExecutor(max_workers=threads) as pool:
         for vid in videos:
             pool.submit(download_audio, vid, dst)
@@ -85,10 +116,8 @@ def validate_url(url: str) -> Tuple[bool, Optional[str]]:
 
     info_cmd = ["yt-dlp", "-J", url]
     try:
-        result = subprocess.run(
-            info_cmd, capture_output=True, text=True, check=True
-        )
-    except subprocess.CalledProcessError:
+        result = _run(info_cmd, capture_output=True, text=True, check=True)
+    except (subprocess.CalledProcessError, YtDlpNotFoundError):
         return False, None
 
     try:

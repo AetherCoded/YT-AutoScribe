@@ -6,7 +6,8 @@ and converts the transcripts into colour-coded SRT subtitle files.
 
 The repository currently contains a minimal GUI with a working downloader pane.
 Downloads are performed using `yt-dlp` and saved into the `downloads/` folder by
-default.
+default. Ensure that the `yt-dlp` executable is installed and available on your
+`PATH` so the application can invoke it.
 
 ## Installation
 
