@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 
 def download_audio(video_id: str, dst: Path) -> None:
@@ -73,3 +73,37 @@ def download_batch(
     with ThreadPoolExecutor(max_workers=threads) as pool:
         for vid in videos:
             pool.submit(download_audio, vid, dst)
+
+
+def validate_url(url: str) -> Tuple[bool, Optional[str]]:
+    """Return whether ``url`` is a valid YouTube playlist/URL.
+
+    If valid, also return a suggested folder name derived from the channel and
+    playlist title. The folder name is stripped of spaces and truncated to keep
+    it short.
+    """
+
+    info_cmd = ["yt-dlp", "-J", url]
+    try:
+        result = subprocess.run(
+            info_cmd, capture_output=True, text=True, check=True
+        )
+    except subprocess.CalledProcessError:
+        return False, None
+
+    try:
+        data = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return False, None
+
+    entries = data.get("entries")
+    if not entries:
+        return False, None
+
+    uploader = data.get("uploader", "")
+    title = data.get("title", "")
+    # Compose a folder name such as ``Uploader_Title`` and remove spaces.
+    folder_name = f"{uploader}_{title}".replace(" ", "") or "NewProject"
+    # Truncate to a reasonable length
+    folder_name = folder_name[:30]
+    return True, folder_name
